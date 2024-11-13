@@ -17,19 +17,29 @@ const TaskCandid = Record({
 let tasks: Task[] = [];  // Array of Task
 let nextId: nat = BigInt(0); // Initialize as a bigint
 
-// Add a new task
+// Helper function to find a task by ID with better error handling
+const findTaskIndexById = (id: bigint): number => {
+    return tasks.findIndex((task) => task.id === id);
+};
+
+// Add a new task with input validation
 export const addTask = update([text], nat, (description) => {
-    if (!description) {
-        throw new Error("Task description cannot be empty.");
+    // Validate that the description is not empty or just whitespace
+    if (!description || description.trim().length === 0) {
+        throw new Error("Task description cannot be empty or just whitespace.");
     }
+
     const newTask: Task = {
         id: nextId,
         description,
         completed: false
     };
+
+    // Increment before pushing the task to ensure uniqueness
+    nextId += BigInt(1);
     tasks.push(newTask);
-    nextId += BigInt(1); // Increment using bigint
-    return newTask.id;
+
+    return newTask.id; // Return the task ID
 });
 
 // View all tasks
@@ -41,22 +51,34 @@ export const getTasks = query([], Vec(TaskCandid), () => {
     }));
 });
 
-// Mark a task as completed
+// Mark a task as completed with error handling
 export const completeTask = update([nat], bool, (id) => {
-    const task = tasks.find((task) => task.id === id);
-    if (task) {
-        task.completed = true;
-        return true; // Task marked as completed
+    // Validate that the ID is valid
+    if (id < BigInt(0)) {
+        throw new Error("Invalid task ID.");
     }
-    return false; // Task not found
+
+    const taskIndex = findTaskIndexById(id);
+    if (taskIndex === -1) {
+        throw new Error(`Task with id ${id} not found.`);
+    }
+
+    tasks[taskIndex].completed = true;
+    return true; // Task marked as completed
 });
 
-// Delete a task
+// Delete a task with better error handling
 export const deleteTask = update([nat], bool, (id) => {
-    const taskIndex = tasks.findIndex((task) => task.id === id);
-    if (taskIndex !== -1) {
-        tasks.splice(taskIndex, 1);
-        return true; // Task deleted
+    // Validate that the ID is valid
+    if (id < BigInt(0)) {
+        throw new Error("Invalid task ID.");
     }
-    return false; // Task not found
+
+    const taskIndex = findTaskIndexById(id);
+    if (taskIndex === -1) {
+        throw new Error(`Task with id ${id} not found.`);
+    }
+
+    tasks.splice(taskIndex, 1);
+    return true; // Task deleted
 });
