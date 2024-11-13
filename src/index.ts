@@ -34,21 +34,17 @@ const validateDescription = (description: string): void => {
     }
 };
 
-// Helper function to find a task by ID with better error handling
-const findTaskIndexById = (id: bigint): number => {
-    return tasks.findIndex((task) => task.id === id);
-};
-
-// Add a new task with input validation
+// Add a new task
 export const addTask = update([text], nat, (description) => {
-    if (!description) {
-        throw new Error("Task description cannot be empty.");
-    }
+    validateDescription(description);
+
     const newTask: Task = {
         id: nextId,
         description,
         completed: false
     };
+
+    nextId += BigInt(1); // Increment nextId after assigning it
     tasks.push(newTask);
 
     return newTask.id; // Return the task ID
@@ -63,22 +59,50 @@ export const getTasks = query([], Vec(TaskCandid), () => {
     }));
 });
 
-// Mark a task as completed with error handling
+// Mark a task as completed
 export const completeTask = update([nat], bool, (id) => {
-    const task = tasks.find((task) => task.id === id);
-    if (task) {
-        task.completed = true;
-        return true; // Task marked as completed
+    if (id < BigInt(0)) {
+        throw new Error("Task ID must be a positive number.");
     }
-    return false; // Task not found
+
+    const taskIndex = findTaskIndexById(id);
+    tasks[taskIndex].completed = true;
+
+    return true; // Task marked as completed
 });
 
-// Delete a task with better error handling
+// Delete a task
 export const deleteTask = update([nat], bool, (id) => {
-    const taskIndex = tasks.findIndex((task) => task.id === id);
-    if (taskIndex !== -1) {
-        tasks.splice(taskIndex, 1);
-        return true; // Task deleted
+    if (id < BigInt(0)) {
+        throw new Error("Task ID must be a positive number.");
     }
-    return false; // Task not found
+
+    const taskIndex = findTaskIndexById(id);
+    tasks.splice(taskIndex, 1);
+
+    return true; // Task deleted
+});
+
+// Edit a task description
+export const editTaskDescription = update([nat, text], bool, (id, newDescription) => {
+    if (id < BigInt(0)) {
+        throw new Error("Task ID must be a positive number.");
+    }
+    validateDescription(newDescription);
+
+    const taskIndex = findTaskIndexById(id);
+    tasks[taskIndex].description = newDescription;
+
+    return true; // Task description updated
+});
+
+// Get tasks filtered by completion status
+export const getTasksByCompletion = query([bool], Vec(TaskCandid), (completed) => {
+    return tasks
+        .filter(task => task.completed === completed)
+        .map(task => ({
+            id: task.id,
+            description: task.description,
+            completed: task.completed
+        }));
 });
