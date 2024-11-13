@@ -7,6 +7,7 @@ type Task = {
     completed: bool;           // Use boolean for JavaScript compatibility
 };
 
+// Candid representation for Task type
 const TaskCandid = Record({
     id: nat,
     description: text,
@@ -14,22 +15,39 @@ const TaskCandid = Record({
 });
 
 // State variables
-let tasks: Task[] = [];  // Array of Task
-let nextId: nat = BigInt(0); // Initialize as a bigint
+let tasks: Task[] = [];         // Array of Task
+let nextId: nat = BigInt(0);    // Initialize as a bigint
+
+// Helper function to find a task index by ID with error handling
+const findTaskIndexById = (id: bigint): number => {
+    const index = tasks.findIndex((task) => task.id === id);
+    if (index === -1) {
+        throw new Error(`Task with ID ${id} not found.`);
+    }
+    return index;
+};
+
+// Helper function to validate task descriptions
+const validateDescription = (description: string): void => {
+    if (!description || description.trim().length === 0) {
+        throw new Error("Task description cannot be empty or just whitespace.");
+    }
+};
 
 // Add a new task
 export const addTask = update([text], nat, (description) => {
-    if (!description) {
-        throw new Error("Task description cannot be empty.");
-    }
+    validateDescription(description);
+
     const newTask: Task = {
         id: nextId,
         description,
         completed: false
     };
+
+    nextId += BigInt(1); // Increment nextId after assigning it
     tasks.push(newTask);
-    nextId += BigInt(1); // Increment using bigint
-    return newTask.id;
+
+    return newTask.id; // Return the task ID
 });
 
 // View all tasks
@@ -43,20 +61,48 @@ export const getTasks = query([], Vec(TaskCandid), () => {
 
 // Mark a task as completed
 export const completeTask = update([nat], bool, (id) => {
-    const task = tasks.find((task) => task.id === id);
-    if (task) {
-        task.completed = true;
-        return true; // Task marked as completed
+    if (id < BigInt(0)) {
+        throw new Error("Task ID must be a positive number.");
     }
-    return false; // Task not found
+
+    const taskIndex = findTaskIndexById(id);
+    tasks[taskIndex].completed = true;
+
+    return true; // Task marked as completed
 });
 
 // Delete a task
 export const deleteTask = update([nat], bool, (id) => {
-    const taskIndex = tasks.findIndex((task) => task.id === id);
-    if (taskIndex !== -1) {
-        tasks.splice(taskIndex, 1);
-        return true; // Task deleted
+    if (id < BigInt(0)) {
+        throw new Error("Task ID must be a positive number.");
     }
-    return false; // Task not found
+
+    const taskIndex = findTaskIndexById(id);
+    tasks.splice(taskIndex, 1);
+
+    return true; // Task deleted
+});
+
+// Edit a task description
+export const editTaskDescription = update([nat, text], bool, (id, newDescription) => {
+    if (id < BigInt(0)) {
+        throw new Error("Task ID must be a positive number.");
+    }
+    validateDescription(newDescription);
+
+    const taskIndex = findTaskIndexById(id);
+    tasks[taskIndex].description = newDescription;
+
+    return true; // Task description updated
+});
+
+// Get tasks filtered by completion status
+export const getTasksByCompletion = query([bool], Vec(TaskCandid), (completed) => {
+    return tasks
+        .filter(task => task.completed === completed)
+        .map(task => ({
+            id: task.id,
+            description: task.description,
+            completed: task.completed
+        }));
 });
